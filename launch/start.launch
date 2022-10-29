@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="swarm-robots" type="stage_launcher.py" name="stage_sim" output="screen" />
+</launch>
