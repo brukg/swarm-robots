@@ -1,0 +1,11 @@
+# behavior params
+coeff_sep: 4
+coeff_ali: 4
+coeff_coh: 2
+
+# robot params
+max_vel: 2
+max_acc: 1
+
+fov: 45 # field of view in degrees for one eye
+max_see_ahead: 0.9

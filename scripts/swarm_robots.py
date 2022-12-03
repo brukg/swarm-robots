@@ -14,7 +14,7 @@ from geometry_msgs.msg import PoseStamped
 
 from utils.behaviors import Behaviors
 from utils.obstacle_avoidance import ObstacleAvoidance
-
+from utils.roaming import Roaming
 class SwaromRobots:
 
     # SwaromRobots Constructor
@@ -26,28 +26,35 @@ class SwaromRobots:
         self.odom = np.zeros((self.num_robots, 3))
         self.cmd_vel = np.zeros((self.num_robots, 3))
 
-        self.coeff_sep = 3
-        self.coeff_coh = 2
-        self.coeff_ali = 4
+        self.coeff_sep = rospy.get_param("~coeff_sep")
+        self.coeff_coh = rospy.get_param("~coeff_coh")
+        self.coeff_ali = rospy.get_param("~coeff_ali")
+
+        self.slowing_distance = 0.5
+        self.slowing_speed = 0.1
+
         self.cmd_pub = [None] * self.num_robots
 
         self.odom_sub =  [None] * self.num_robots
 
         self.pose = np.zeros((self.num_robots, 3))
         self.vel = np.zeros((self.num_robots, 3))
+
         # change dt at a later time
-        self.dt = 0.01
+        self.dt = 0.1
 
         # set maximum values
-        self.max_acc = 1
-        self.max_vel = 2        
-        
-        # List of points which define the plan. None if there is no plan
-        self.path = []
-        # State Validity Checker object                                                 
-        self.oa = ObstacleAvoidance(self.num_robots)
+        self.max_acc = rospy.get_param("~max_acc")
+        self.max_vel = rospy.get_param("~max_vel")
+
+        self.fov = rospy.get_param("~fov")
+        self.max_see_ahead = rospy.get_param("~max_see_ahead")
+
+        self.oa = ObstacleAvoidance(r=self.num_robots, fov=self.fov, max_see_ahead=self.max_see_ahead)
+
         self.behaviors = Behaviors(self.num_robots, self.max_acc, self.max_vel)
-        
+
+        self.roaming = Roaming(self.max_vel, self.slowing_speed, self.slowing_distance)
         # Goal where the robot has to move, None if it is not set                                                                   
         self.goal = None
         # Last time a map was received (to avoid map update too often)                                                
@@ -116,6 +123,9 @@ class SwaromRobots:
         Velocity controller
 
         """        
+        if self.goal is not None:
+            # self.vel[:,0:2] = self.roaming.seek(self.pose[:,0:2], self.goal, self.vel[:,0:2]) * self.dt
+            self.vel[:,0:2] = self.roaming.arrival(self.pose[:,0:2], self.goal, self.vel[:,0:2], self.slowing_speed, self.slowing_distance) * self.dt
         # start behaviors
         self.combined_acc = self.behaviors.seperation(self.pose, self.coeff_sep) + self.behaviors.cohesion(self.pose, self.coeff_coh) + self.behaviors.alignment(self.vel, self.coeff_ali)
         self.vel = self.combined_acc * self.dt + self.vel

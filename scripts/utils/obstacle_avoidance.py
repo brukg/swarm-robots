@@ -3,7 +3,7 @@ import numpy as np
 class ObstacleAvoidance:
 
     # Constructor
-    def __init__(self, r, distance=0.2):
+    def __init__(self, r, distance=0.2, fov=np.pi/4, max_see_ahead=0.5):
         # map: 2D array of integers which categorizes world occupancy
         self.map = None 
         # map sampling resolution (size of a cell))                            
@@ -18,7 +18,8 @@ class ObstacleAvoidance:
         self.ahead = np.zeros((r,2))
         self.ahead_l = np.zeros((r,2))
         self.ahead_r = np.zeros((r,2))
-
+        self.fov = np.deg2rad(fov)
+        self.max_see_ahead = max_see_ahead
 
         self.obstacle_center = np.zeros((r,2))
         self.avoidance_vector = np.zeros((r,2))
@@ -32,7 +33,7 @@ class ObstacleAvoidance:
         print("Map set", self.map.shape)
         print(self.map[-2, -2])
         
-    def look_ahead(self, pose, vel, MAX_SEE_AHEAD=0.9):
+    def look_ahead(self, pose, vel):
         """Given a pose and a velocity, predicts the position of the robot ahead and check if it is obstacle free.
         
         Args:
@@ -48,8 +49,8 @@ class ObstacleAvoidance:
         self.avoidance_vector = np.zeros((self.num_robots,2))
 
         #look ahead for each robot x, y
-        self.ahead[:,0] = pose[:,0] + vel[:,0] * MAX_SEE_AHEAD
-        self.ahead[:,1] = pose[:,1] + vel[:,1] * MAX_SEE_AHEAD
+        self.ahead[:,0] = pose[:,0] + vel[:,0] * self.max_see_ahead
+        self.ahead[:,1] = pose[:,1] + vel[:,1] * self.max_see_ahead
 
         # line vector pointing to the front of the robot
         L = self.ahead - pose
@@ -63,18 +64,18 @@ class ObstacleAvoidance:
 
 
         #rotate the line vector by 30 degrees
-        self.ahead_l[:,0] = pose[:,0] + L_norm*np.cos(alpha + np.pi/6)
-        self.ahead_l[:,1] = pose[:,1] +L_norm*np.sin(alpha + np.pi/6)
+        self.ahead_l[:,0] = pose[:,0] + L_norm*np.cos(alpha + self.fov)
+        self.ahead_l[:,1] = pose[:,1] +L_norm*np.sin(alpha + self.fov)
 
         #rotate the line vector by -30 degrees
-        self.ahead_r[:,0] = pose[:,0] + L_norm*np.cos(alpha - np.pi/6)   
-        self.ahead_r[:,1] = pose[:,1] + L_norm*np.sin(alpha - np.pi/6)
+        self.ahead_r[:,0] = pose[:,0] + L_norm*np.cos(alpha - self.fov)   
+        self.ahead_r[:,1] = pose[:,1] + L_norm*np.sin(alpha - self.fov)
         if self.there_is_map:
 
             for i in range(0, self.num_robots):
                 
-                print("pose", i, pose[i,:])
-                print("ahead", self.ahead[i,:])
+                # print("pose", i, pose[i,:])
+                # print("ahead", self.ahead[i,:])
 
 
                 if not self.is_valid(self.ahead[i,:]) or not self.is_valid(self.ahead_l[i,:])  or not self.is_valid(self.ahead_r[i,:]):
@@ -88,22 +89,25 @@ class ObstacleAvoidance:
                     # print("ahead valid",  self.is_valid(self.ahead[i,:]))
                     # print("left valid ", self.is_valid(self.ahead_l[i,:]))
                     # print("right valid", self.is_valid(self.ahead_r[i,:]))
-                    if not self.is_valid(self.ahead_l[i,:])  and not self.is_valid(self.ahead_r[i,:]):
+                    if not self.is_valid(self.ahead[i,:])  and \
+                       not self.is_valid(self.ahead_l[i,:])  and \
+                       not self.is_valid(self.ahead_r[i,:]):
+
                         self.avoidance_vector[i,0] =  pose[i,0] - self.ahead[i,0]
                         self.avoidance_vector[i,1] =  pose[i,1] - self.ahead[i,1]
                         self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
-                    elif not self.is_valid(self.ahead_l[i,:]):
+                    elif not self.is_valid(self.ahead_l[i,:]) and self.is_valid(self.ahead_r[i,:]):
                         # print("Obstacle ahead left")
-                        self.avoidance_vector[i,0] =  self.ahead[i,0] - self.ahead_l[i,0]
-                        self.avoidance_vector[i,1] =  self.ahead[i,1] - self.ahead_l[i,1]
+                        self.avoidance_vector[i,0] =  self.ahead_r[i,0] - self.ahead_l[i,0]
+                        self.avoidance_vector[i,1] =  self.ahead_r[i,1] - self.ahead_l[i,1]
                         self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
 
-                    elif not self.is_valid(self.ahead_r[i,:]) or not self.is_valid(self.ahead[i,:]):
+                    elif not self.is_valid(self.ahead_r[i,:]) and self.is_valid(self.ahead_l[i,:]):
                         # print("Obstacle ahead right")
                         # self.obstacle_center[i,0] = self.ahead_r[i,0]
                         # self.obstacle_center[i,1] = self.ahead_r[i,1]
-                        self.avoidance_vector[i,0] =  self.ahead[i,0] - self.ahead_r[i,0]
-                        self.avoidance_vector[i,1] =  self.ahead[i,1] - self.ahead_r[i,1]
+                        self.avoidance_vector[i,0] =  self.ahead_l[i,0] - self.ahead_r[i,0]
+                        self.avoidance_vector[i,1] =  self.ahead_l[i,1] - self.ahead_r[i,1]
                         self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
                     else:
                         # print("No obstacle ahead")
