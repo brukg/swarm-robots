@@ -9,83 +9,54 @@ class Behaviors:
         self.max_vel = max_vel
         self.number_of_robots = number_of_robots
 
-    def seperation(self, odom, coeff_sep):
-        # take advantage of array broadcasting for fast optimization
-        i_points = j_points = odom
-        # broadcast arrays
-        i_points = i_points[np.newaxis,:,:]
-        j_points = j_points[:,np.newaxis,:]
-        # get position difference
-        diff_i_j = i_points - j_points
-        # remove 0 values
-        # diff_i_j = diff_i_j[diff_i_j != 0.].reshape((self.number_of_robots,self.number_of_robots-1,2))
-        # get norm
-        norm_i_j = np.linalg.norm(diff_i_j, axis=2).reshape((self.number_of_robots,self.number_of_robots,1))
-        norm_i_j = norm_i_j**2
-        norm_i_j[norm_i_j == 0.] = 1
-        # get final result
-        fin_i_j = diff_i_j/norm_i_j
-        seperation_acc = (-coeff_sep/self.number_of_robots)*np.sum(fin_i_j, axis=1)
-        # temporary measure to preserve array dimensions
-        # seperation_acc = np.concatenate((seperation_acc, np.zeros((self.number_of_robots,1))), axis=1)
+    def seperation(self, odom, neighbors, coeff_sep):
+        # initialize seperation acceleration
+        seperation_acc = np.zeros((self.number_of_robots, 3))
+        for robot in range(self.number_of_robots):
+            # get number of neighbors
+            num_of_neighbors = np.shape(neighbors[robot])[0]
+            # get position difference
+            pos_odom = odom[:,:2]
+            diff_neighbor_robot = neighbors[robot][:,:2] - pos_odom[robot,:].reshape((1,2))
+            # get norm
+            norm_neighbor_robot = np.linalg.norm(diff_neighbor_robot, axis=1).reshape((num_of_neighbors, 1))
+            norm_neighbor_robot = norm_neighbor_robot**2
+            norm_neighbor_robot[norm_neighbor_robot == 0.] = 1
+            # get final result
+            fin_neighbor_robot = diff_neighbor_robot/norm_neighbor_robot
+            # get acceleration
+            seperation_acc[robot,:2] = (-coeff_sep/num_of_neighbors)*np.sum(fin_neighbor_robot, axis=0)
+
         return seperation_acc
 
-    def cohesion(self, odom, coeff_coh):
-        # take advantage of array broadcasting for fast optimization
-        i_points = j_points = odom
-        # broadcast arrays
-        i_points = i_points[np.newaxis,:,:]
-        j_points = j_points[:,np.newaxis,:]
-        # get position difference
-        diff_i_j = i_points - j_points
-        # get final result
-        cohesion_acc = (coeff_coh/self.number_of_robots)*np.sum(diff_i_j, axis=1)
-        # temporary measure to preserve array dimensions
-        # cohesion_acc = np.concatenate((cohesion_acc, np.zeros((self.number_of_robots,1))), axis=1)
+    def cohesion(self, odom, neighbors, coeff_coh):
+        # initialize cohesion acceleration
+        cohesion_acc = np.zeros((self.number_of_robots, 3))
+        for robot in range(self.number_of_robots):
+            # get number of neighbors
+            num_of_neighbors = np.shape(neighbors[robot])[0]
+            # get position difference
+            pos_odom = odom[:,:2]
+            diff_neighbor_robot = neighbors[robot][:,:2] - pos_odom[robot,:].reshape((1,2))
+            # get final result
+            fin_neighbor_robot = diff_neighbor_robot
+            # get acceleration
+            cohesion_acc[robot,:2] = (coeff_coh/num_of_neighbors)*np.sum(fin_neighbor_robot, axis=0)
+
         return cohesion_acc
 
-    def alignment(self, vel, coeff_ali):
-        # take advantage of array broadcasting for fast optimization
-        i_points = j_points = vel
-        # broadcast arrays
-        i_points = i_points[np.newaxis,:,:]
-        j_points = j_points[:,np.newaxis,:]
-        # get position difference
-        diff_i_j = i_points - j_points
-        # get final result
-        alignment_acc = (coeff_ali/self.number_of_robots)*np.sum(diff_i_j, axis=1)
-        # temporary measure to preserve array dimensions
-        # alignment_acc = np.concatenate((alignment_acc, np.zeros((self.number_of_robots,1))), axis=1)
+    def alignment(self, vel, neighbors_vel, coeff_ali):
+        # initialize alignment acceleration
+        alignment_acc = np.zeros((self.number_of_robots, 3))
+        for robot in range(self.number_of_robots):
+            # get number of neighbors
+            num_of_neighbors = np.shape(neighbors_vel[robot])[0]
+            # get position difference
+            pos_vel = vel[:,:2]
+            diff_neighbor_robot = neighbors_vel[robot][:,:2] - pos_vel[robot,:].reshape((1,2))
+            # get final result
+            fin_neighbor_robot = diff_neighbor_robot
+            # get acceleration
+            alignment_acc[robot,:2] = (coeff_ali/num_of_neighbors)*np.sum(fin_neighbor_robot, axis=0)
+
         return alignment_acc
-
-
-# hypothetical number of robots
-hyp_number_of_robots = 4
-
-# the following is an example of good code optimization using array broadcasting
-i_points = np.array([[1.,2.], [2.,3.], [4.,5.], [5.,6.]])
-j_points = np.array([[1.,2.], [2.,3.], [4.,5.], [5.,6.]])
-
-# broadcast arrays
-i_points = i_points[np.newaxis,:,:]
-j_points = j_points[:,np.newaxis,:]
-diff_i_j = i_points - j_points
-# print(diff_i_j)
-
-# remove 0 values
-# diff_i_j = diff_i_j[diff_i_j != 0.].reshape((hyp_number_of_robots,hyp_number_of_robots-1,2))
-# print(diff_i_j)
-
-# get norm
-norm_i_j = np.linalg.norm(diff_i_j, axis=2).reshape((hyp_number_of_robots,hyp_number_of_robots,1))
-norm_i_j = norm_i_j**2
-norm_i_j[norm_i_j == 0.] = 1
-# print(norm_i_j)
-
-# final result
-fin_i_j = diff_i_j/norm_i_j
-# print(fin_i_j)
-
-# sum of coordinates
-sum_i_j = np.sum(fin_i_j, axis=1)
-# print(sum_i_j)

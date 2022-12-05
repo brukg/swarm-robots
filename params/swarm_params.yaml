@@ -1,5 +1,5 @@
 # behavior params
-coeff_sep: 4
+coeff_sep: 6
 coeff_ali: 4
 coeff_coh: 2
 
@@ -7,5 +7,17 @@ coeff_coh: 2
 max_vel: 2
 max_acc: 1
 
-fov: 45 # field of view in degrees for one eye
-max_see_ahead: 0.9
+fov: 60 # field of view in degrees for one eye
+max_see_ahead: 0.2
+
+
+#roaming params
+roaming_coeff: 3
+slowing_speed: 0.1
+slowing_distance: 0.5
+
+#obstacle avoidance params
+avoidance_coeff: 20
+
+neighbors_radius: 0.5
+
