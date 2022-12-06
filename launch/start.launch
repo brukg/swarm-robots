@@ -1,6 +1,9 @@
 <launch>
     <arg name="node_start_delay" default="2"/>
     <node pkg="swarm-robots" type="stage_launcher.py" name="stage_sim" output="screen" />
+    <node name="velocity_gui" pkg="slider_publisher" type="slider_publisher" output="screen" respawn="true">
+        <param name="file" value="$(find swarm-robots)/params/slider_swarm_params.yaml"/>
+    </node>
     
     <!-- rviz -->
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find swarm-robots)/config/config.rviz" />

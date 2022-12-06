@@ -11,7 +11,6 @@ class ObstacleAvoidance:
         self.origin = None
         self.there_is_map = False
         self.num_robots = r
-
         self.distance = distance                    
         self.ahead = np.zeros((r, 2))
         self.ahead_l = np.zeros((r, 2))
@@ -29,7 +28,7 @@ class ObstacleAvoidance:
         self.there_is_map = True
 
         # map output
-        print("Map set:")
+        print("Map set:", self.map.shape)
 
     def look_ahead(self, pose, vel):
         """
@@ -73,22 +72,22 @@ class ObstacleAvoidance:
                     if not self.is_valid(self.ahead[i,:]) and not self.is_valid(self.ahead_l[i,:]) and not self.is_valid(self.ahead_r[i,:]):
                         self.avoidance_vector[i,0] =  pose[i,0] - self.ahead[i,0]
                         self.avoidance_vector[i,1] =  pose[i,1] - self.ahead[i,1]
-                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
+                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:]) if np.linalg.norm(self.avoidance_vector[i,:])!=0 else self.avoidance_vector[i,:]
 
                     elif not self.is_valid(self.ahead_l[i,:]) and self.is_valid(self.ahead_r[i,:]):
                         self.avoidance_vector[i,0] =  self.ahead_r[i,0] - self.ahead_l[i,0]
                         self.avoidance_vector[i,1] =  self.ahead_r[i,1] - self.ahead_l[i,1]
-                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
+                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])  if np.linalg.norm(self.avoidance_vector[i,:])!=0 else self.avoidance_vector[i,:]
 
                     elif not self.is_valid(self.ahead_r[i,:]) and self.is_valid(self.ahead_l[i,:]):
                         self.avoidance_vector[i,0] =  self.ahead_l[i,0] - self.ahead_r[i,0]
                         self.avoidance_vector[i,1] =  self.ahead_l[i,1] - self.ahead_r[i,1]
-                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])
+                        self.avoidance_vector[i,:] = self.avoidance_vector[i,:]/np.linalg.norm(self.avoidance_vector[i,:])  if np.linalg.norm(self.avoidance_vector[i,:])!=0 else self.avoidance_vector[i,:]
 
                     else:
                         self.avoidance_vector = np.zeros((self.num_robots, 2))
 
-            return self.avoidance_vector
+        return self.avoidance_vector
 
     # given a pose, should return True if not in collision, otherwise it should return False
     def is_valid(self, pose):

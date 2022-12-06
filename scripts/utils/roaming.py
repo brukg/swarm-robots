@@ -37,6 +37,7 @@ class Roaming:
     def arrival(self, position: np.array, target: np.array, velocity: np.array, slowdown_speed: float, slowing_distance: float) -> np.array:
         """
         This function returns the steering velocity to reach the target using the arrival algorithm.
+
         :param position: The current position of the robots.
         :param target: The target position.
         :param velocity: The current velocity of the robots.
@@ -52,7 +53,7 @@ class Roaming:
         distance = np.linalg.norm(offset)
         
         # if we are not very close to the target
-        if distance > 2:
+        if distance > 3:
             
             # normalize the desired velocity vector
             desired_velocity = (offset/np.linalg.norm(offset, axis=1)[:,None])
@@ -71,6 +72,6 @@ class Roaming:
         
         # if we are close to the goal, we nullify the desired velocity 
         else:
-            steering_velocity = np.zeros(2)
+            steering_velocity = np.zeros((position.shape[0], position.shape[1]))
         
         return steering_velocity
