@@ -12,16 +12,18 @@ from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Float32
 from visualization_msgs.msg import Marker
 
-import utils.fov as fov
+from utils.fov import circle_fov, field_of_view
+
 import utils.visualization_functions as utilsFunc
 
 from utils.behaviors import Behaviors
 from utils.obstacle_avoidance import ObstacleAvoidance
 from utils.roaming import Roaming
+from utils.formation_control import FormationControl
 
 class SwarmRobots:
 
-    def __init__(self, gridmap_topic, odom_topic, cmd_vel_topic, dominion):
+    def __init__(self, gridmap_topic, odom_topic, cmd_vel_topic):
 
         # initialize attributes
         self.num_robots = rospy.get_param("/num_of_robots")
@@ -70,16 +72,18 @@ class SwarmRobots:
         # THIS VALUE NEEDS TO BE CHANGED
         self.dt = 0.03
 
+        # choose formation
+        self.formation_structure = np.array([[0,0], [1,0], [2,0], [0,2], [2,2]])
+
         self.oa = ObstacleAvoidance(r=self.num_robots, fov=self.fov, max_see_ahead=self.max_see_ahead)
         self.behaviors = Behaviors(self.num_robots, self.max_acc, self.max_vel)
         self.roaming = Roaming(self.max_vel, self.slowing_speed, self.slowing_distance)
-
+        self.formation_control = FormationControl(self.pose, 1, self.num_robots, self.formation_structure, self.neighbors_radius, self.behaviors)
         # roaming goal, set to None if not chosen                                                                 
         self.goal = None
 
         # avoid updating the map too often                                               
         self.last_map_time = rospy.Time.now()                       
-        self.dominion = dominion                                        
 
         # controller parameters              
         self.v_max = 0.15             
@@ -117,10 +121,18 @@ class SwarmRobots:
     
     # odometry callback gets the current robot pose and stores it in self.pose
     def odom_callback(self, odom, r):
-        _, _, yaw = tf.transformations.euler_from_quaternion([odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w])
+        _, _, yaw = tf.transformations.euler_from_quaternion([odom.pose.pose.orientation.x, 
+                                                            odom.pose.pose.orientation.y, 
+                                                            odom.pose.pose.orientation.z, 
+                                                            odom.pose.pose.orientation.w])
         self.pose[r,0] = odom.pose.pose.position.x
         self.pose[r,1] = odom.pose.pose.position.y
         self.pose[r,2] = yaw
+
+        self.vel[r,0] = odom.twist.twist.linear.x
+        self.vel[r,1] = odom.twist.twist.linear.y
+        self.vel[r,2] = odom.twist.twist.angular.z
+        #generate a 
         
     # goal callback
     def get_goal(self, goal):
@@ -141,28 +153,31 @@ class SwarmRobots:
     # main velocity controller
     def controller(self, event):
 
-        # get roaming velocities
-        if self.goal is not None:
-            self.vel[:,0:2] += self.roaming_coeff*self.roaming.arrival(self.pose[:,0:2], self.goal, self.vel[:,0:2], self.slowing_speed, self.slowing_distance)*self.dt
-        
-            # self.roaming_acc = self.roaming.arrival(self.pose[:,0:2], self.goal, self.vel[:,0:2], self.slowing_speed, self.slowing_distance)
-            # self.roaming_acc = np.concatenate((self.roaming_acc, np.zeros((self.num_robots, 1))), axis=1)
+        if 0:
+            # get roaming velocities
+            if self.goal is not None:
+                self.vel[:,0:2] += self.roaming_coeff*self.roaming.arrival(self.pose[:,0:2], self.goal, self.vel[:,0:2], self.slowing_speed, self.slowing_distance)*self.dt
+            
+                # self.roaming_acc = self.roaming.arrival(self.pose[:,0:2], self.goal, self.vel[:,0:2], self.slowing_speed, self.slowing_distance)
+                # self.roaming_acc = np.concatenate((self.roaming_acc, np.zeros((self.num_robots, 1))), axis=1)
 
-        # get neighbors list for each robot
-        neighbors_list, vel_list, no_neighbors_list = fov.circle_fov(self.pose, self.vel, self.num_robots, self.neighbors_radius)
+            # get neighbors list for each robot
+            neighbors_list, vel_list, no_neighbors_list = circle_fov(self.pose, self.vel, self.num_robots, self.neighbors_radius)
 
-        # get the acceleration of the three main behaviors
-        self.combined_acc = self.roaming_coeff*self.roaming_acc + self.behaviors.seperation(self.pose, neighbors_list, self.coeff_sep) + self.behaviors.cohesion(self.pose, neighbors_list, self.coeff_coh) + self.behaviors.alignment(self.vel, vel_list, self.coeff_ali)
-        self.vel = self.combined_acc*self.dt + self.vel
+            # get the acceleration of the three main behaviors
+            self.combined_acc = self.roaming_coeff*self.roaming_acc + self.behaviors.seperation(self.pose, neighbors_list, self.coeff_sep) + self.behaviors.cohesion(self.pose, neighbors_list, self.coeff_coh) + self.behaviors.alignment(self.vel, vel_list, self.coeff_ali)
+            self.vel = self.combined_acc*self.dt + self.vel
 
-        # obstacle avoidance
-        self.vel_norm = self.dt*self.vel
-        avoidance_force = self.oa.look_ahead(self.pose[:,0:2], self.vel_norm)
-        self.vel[:,0:2] = self.vel[:,0:2] + self.avoidance_coeff*avoidance_force
-
-        utilsFunc.publish_corners(no_neighbors_list[1], self.publish_flock, frame='map', color=(0.23, 0.33, 0.33, 1), scale=0.1)
-        utilsFunc.publish_corners(neighbors_list[1], self.publish_neighbors, frame='map', color=(0, 1, 0, 1))
-        utilsFunc.publish_agent(self.pose[1,:2], self.publish_agent, scale=self.neighbors_radius)
+            # obstacle avoidance
+            self.vel_norm = self.vel
+            avoidance_force = self.oa.look_ahead(self.pose[:,0:2], self.vel_norm)
+            self.vel[:,0:2] = self.vel[:,0:2] + self.avoidance_coeff*avoidance_force
+            print("test")
+        else:
+            self. vel[:,0:2] = self.formation_control.formation()
+        # utilsFunc.publish_corners(no_neighbors_list[1], self.publish_flock, frame='map', color=(0.23, 0.33, 0.33, 1), scale=0.1)
+        # utilsFunc.publish_corners(neighbors_list[1], self.publish_neighbors, frame='map', color=(0, 1, 0, 1))
+        # utilsFunc.publish_agent(self.pose[1,:2], self.publish_agent, scale=self.neighbors_radius)
 
         for r in range(self.num_robots):
             v = self.vel[r,0]
@@ -184,5 +199,5 @@ class SwarmRobots:
 
 if __name__ == '__main__':
     rospy.init_node('swarm_robots')   
-    node = SwarmRobots('/map', '/odom', '/cmd_vel', np.array([-15.0, 15.0]))
+    node = SwarmRobots('/map', '/odom', '/cmd_vel')
     rospy.spin()

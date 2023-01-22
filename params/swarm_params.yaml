@@ -1,5 +1,5 @@
 # behavior params
-coeff_sep: 6
+coeff_sep: 0.1
 coeff_ali: 4
 coeff_coh: 2
 
@@ -19,5 +19,5 @@ slowing_distance: 0.5
 #obstacle avoidance params
 avoidance_coeff: 20
 
-neighbors_radius: 0.5
+neighbors_radius: 5
 
