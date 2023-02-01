@@ -20,7 +20,7 @@ from utils.behaviors import Behaviors
 from utils.obstacle_avoidance import ObstacleAvoidance
 from utils.roaming import Roaming
 from utils.formation_control import FormationControl
-
+from utils.draw import get_shape, main
 class SwarmRobots:
 
     def __init__(self, gridmap_topic, odom_topic, cmd_vel_topic):
@@ -73,12 +73,19 @@ class SwarmRobots:
         self.dt = 0.03
 
         # choose formation
-        self.formation_structure = np.array([[0,0], [1,0], [2,0], [0,2], [2,2]])
+        # self.formation_structure = np.array([[0,0], [1,0], [2,0], [0,2], [2,2]])
+        self.formation_structure = np.array([[0,0], [0,1], [0,2], [0,3], [0,4], [1,4], [2,2], [1,2], [2,4], [1, 5]]) #F
+        
+        # self.formation_structure = np.array([[3, 1], [0,0], [0,1], [0,0.5], [0,1.5], [0,2], [0.5,2], [1,1], [0.5,1], [1,2],
+        #                                      [2.5,0], [3,0], [3.5,0], [2.5,0.5], [2.5,1], [2.5, 1.5], [2.5, 2], [3, 2], [3.5, 1], [3.5, 2],
+        #                                      [5,0],  [5, 0.5], [6, 0], [5.5, 0.5], [5, 1], [5, 1.5], [5, 2], [5.5, 2], [5.5, 1], [6, 2], [6, 1],  [6.2, 1.5]
+        #                                      ]) #FER
 
         self.oa = ObstacleAvoidance(r=self.num_robots, fov=self.fov, max_see_ahead=self.max_see_ahead)
         self.behaviors = Behaviors(self.num_robots, self.max_acc, self.max_vel)
         self.roaming = Roaming(self.max_vel, self.slowing_speed, self.slowing_distance)
         self.formation_control = FormationControl(self.pose, 1, self.num_robots, self.formation_structure, self.neighbors_radius, self.behaviors)
+        # self.input_window = main()
         # roaming goal, set to None if not chosen                                                                 
         self.goal = None
 
@@ -100,7 +107,7 @@ class SwarmRobots:
         
         # velocity controller timer
         rospy.Timer(rospy.Duration(0.05), self.controller)
-
+        rospy.Timer(rospy.Duration(0.5), main())
     def callback_coeff_sep(self, data):
         self.coeff_sep = data.data
 
@@ -129,9 +136,9 @@ class SwarmRobots:
         self.pose[r,1] = odom.pose.pose.position.y
         self.pose[r,2] = yaw
 
-        self.vel[r,0] = odom.twist.twist.linear.x
-        self.vel[r,1] = odom.twist.twist.linear.y
-        self.vel[r,2] = odom.twist.twist.angular.z
+        # self.vel[r,0] = odom.twist.twist.linear.x
+        # self.vel[r,1] = odom.twist.twist.linear.y
+        # self.vel[r,2] = odom.twist.twist.angular.z
         #generate a 
         
     # goal callback
@@ -174,7 +181,17 @@ class SwarmRobots:
             self.vel[:,0:2] = self.vel[:,0:2] + self.avoidance_coeff*avoidance_force
             print("test")
         else:
-            self. vel[:,0:2] = self.formation_control.formation()
+            new_shape = get_shape()
+            if type(new_shape) is np.ndarray:
+                print(new_shape)
+                self.formation_structure = new_shape
+                # self.formation_control.formation_structure = new_shape.copy()
+                self.formation_control.set_structure(new_shape)
+                # self.formation_control = FormationControl(self.pose, 1, self.num_robots, self.formation_structure, self.neighbors_radius, self.behaviors)
+                print("get shape", self.formation_structure)
+                new_shape = None
+            self.vel[:,0:2] = self.formation_control.formation()
+            # print("test2")
         # utilsFunc.publish_corners(no_neighbors_list[1], self.publish_flock, frame='map', color=(0.23, 0.33, 0.33, 1), scale=0.1)
         # utilsFunc.publish_corners(neighbors_list[1], self.publish_neighbors, frame='map', color=(0, 1, 0, 1))
         # utilsFunc.publish_agent(self.pose[1,:2], self.publish_agent, scale=self.neighbors_radius)
